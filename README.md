@@ -119,33 +119,6 @@ PyAV 19 removed, which breaks every decode. The tests caught this.
 - A one-second warm-up transcription at start-up makes missing CUDA or cuDNN libraries fail
   immediately, not on the first user's upload.
 
-**11. GPU libraries are not in `requirements.txt`.**
-CPU users, including all Mac users, would otherwise download gigabytes of CUDA libraries they can't
-use. GPU users install them separately (see [NVIDIA GPU configuration](#4-nvidia-gpu-configuration-linux-x86_64--windows-x64)).
-
-## Supported platforms
-
-| Platform | CPU | NVIDIA GPU | Notes |
-|---|---|---|---|
-| Linux x86_64 | ✅ | ✅ with CUDA 12 + cuDNN 9 | Tested here (CPU only) |
-| Windows x64 | ✅ | ✅ with CUDA 12 + cuDNN 9 | Not tested |
-| macOS Apple Silicon (M1–M4) | ✅ | — | Not tested. CPU only: faster-whisper has no Apple GPU (Metal) backend |
-| macOS Intel | ✅ | — | Not tested |
-| Linux ARM64 (e.g. Graviton, Ampere) | ✅ | ❌ | Not tested. The PyPI CTranslate2 wheel for ARM64 Linux has no CUDA support |
-| Windows ARM64 | ❌ | ❌ | No CTranslate2 wheel is published |
-
-How these were established:
-
-- **Run and tested:** Linux x86_64, CPU, Python 3.10, 3.11, 3.12 and 3.13, each in a fresh venv
-  from `requirements.txt`.
-- **Checked against PyPI, not run:** every other row. The required wheels (CTranslate2, PyAV,
-  onnxruntime, tokenizers, psycopg-binary) are published for those platforms. The CTranslate2
-  wheels were inspected: only the Linux x86_64 and Windows x64 builds load CUDA libraries.
-
-**Apple Silicon.** The service runs on the CPU. `WHISPER_DEVICE=auto` picks the CPU automatically,
-and `WHISPER_DEVICE=cuda` stops at start-up with an explanation. Use `int8` (the default) and a
-`small` or `base` model for good speed.
-
 ## Setup
 
 ### 1. Prerequisites
