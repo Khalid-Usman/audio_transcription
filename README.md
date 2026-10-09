@@ -1,6 +1,6 @@
 # Audio Transcription Service
 
-A small FastAPI service that transcribes audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+A FastAPI service that transcribes audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 and returns the text with start and end timestamps for each segment. Short recordings get their
 transcription in the upload response. Long recordings get a job ID to poll. Job state and results
 are stored in PostgreSQL, and uploaded audio in a local folder.
@@ -41,9 +41,6 @@ app/
   transcriber.py  device selection, model loading, audio validation, transcription
   jobs.py         thread-pool job runner with a concurrency limit and restart recovery
   db.py           PostgreSQL table and queries (plain SQL)
-tests/
-  test_transcription.py
-  audio/          test recordings (an 11 s speech clip as WAV, MP3, M4A, FLAC, plus a 33 s MP3)
 ```
 
 The code is kept deliberately small: about 600 lines of application code in six modules, with no
@@ -125,18 +122,6 @@ PyAV 19 removed, which breaks every decode. The tests caught this.
 **11. GPU libraries are not in `requirements.txt`.**
 CPU users, including all Mac users, would otherwise download gigabytes of CUDA libraries they can't
 use. GPU users install them separately (see [NVIDIA GPU configuration](#4-nvidia-gpu-configuration-linux-x86_64--windows-x64)).
-
-**12. Plain SQL and a connection pool, no ORM.**
-There is one table and a handful of queries. Plain SQL with `psycopg` is shorter, and it's easier to
-see exactly what runs against the database.
-
-**13. Tests read real recordings from files, against real dependencies.**
-There's no code that synthesises audio: the tests read real speech recordings from `tests/audio/`
-(or any folder set in `TEST_AUDIO_DIR`). They run against a real PostgreSQL database and the real
-faster-whisper model, with no mocks. Real speech exercises voice detection and decoding the way
-production audio does, and with a real model the tests also check the words (the transcript must
-contain "country"). Testing against real dependencies is how the PyAV incompatibility above was
-found; a mocked decoder would have passed.
 
 ## Supported platforms
 
@@ -341,58 +326,3 @@ Set them in the environment or in `.env` (see `.env.example`).
 | `MAX_AUDIO_DURATION_SECONDS` | `10800` | Longest accepted recording (3 h) |
 | `DATA_DIR` | `data` | Uploaded audio is stored in `DATA_DIR/audio` |
 | `LOG_LEVEL` | `INFO` | Logging level |
-
-## Tests
-
-The tests use a real PostgreSQL database and a real Whisper model, and read their audio from files
-in `tests/audio/`: an 11-second speech clip saved as WAV, MP3, M4A and FLAC, plus a 33-second MP3
-for the long-recording path. The clip is from President Kennedy's 1961 inaugural address (public
-domain, the same sample faster-whisper uses in its own tests), converted to 16 kHz mono.
-
-```bash
-createdb transcription_test                       # a database used only for tests
-export TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/transcription_test
-pytest -q
-```
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `TEST_DATABASE_URL` | – (required) | A database used only for tests; its `transcription_jobs` table is emptied. Without it, the tests are skipped |
-| `TEST_WHISPER_MODEL` | `tiny` | Model name (the first run downloads `tiny`, ~75 MB) or a local model directory |
-| `TEST_AUDIO_DIR` | `tests/audio` | Folder the test recordings are read from; point it at your own files with the same names |
-| `TEST_EXPECTED_WORD` | `country` | A word the transcript must contain; set it empty to check structure only |
-
-What the 10 tests cover:
-
-- The speech clip in each of WAV, MP3, M4A and FLAC is uploaded and returned directly (`200`). The
-  transcript contains the expected word, the timestamps stay within the recording, and the stored
-  job and result can be fetched again.
-- The 33-second recording returns `202`, is polled to `completed`, and its result is fetched.
-- Invalid content, an empty file and an unsupported extension are rejected with the right code.
-- The result endpoint returns `409` until a job is done; unknown and malformed job IDs return `404`
-  and `422`.
-- `/health` works.
-
-## Known limitations
-
-- **Platform testing:** only Linux x86_64 on CPU was actually run (see the platform table). macOS,
-  Windows, ARM64 and NVIDIA GPUs are supported by the published wheels but weren't run here.
-- **Accuracy wasn't measured on the build machine.** It couldn't download Whisper weights, so its
-  test runs used a randomly initialised tiny Whisper model with `TEST_EXPECTED_WORD` empty. That
-  exercises the real faster-whisper code (model loading, VAD, decoding, timestamps) on the real
-  speech files, but produces meaningless text. On your machine the tests use the real `tiny` model
-  and also check the transcript contains "country".
-- **Memory:** the whole recording is decoded into memory as 16 kHz float32, about 230 MB per hour
-  of audio, hence `MAX_AUDIO_DURATION_SECONDS`.
-- **Single process:** the job queue lives in one process. Jobs survive restarts (they're in
-  PostgreSQL), but several processes or machines can't share the queue.
-- **Responsiveness under load:** measured on a 2-core machine with two 30-minute transcriptions
-  running, `/health` answered with a median of 3.7 ms, p95 of 9.8 ms and maximum of 49 ms. Python
-  parts of faster-whisper (e.g. VAD bookkeeping) briefly hold the GIL, so expect small latency
-  bumps, not blocking.
-- **PyAV is pinned below 19:** faster-whisper 1.2.1 can't decode files with PyAV 19 (it passes an
-  argument PyAV 19 removed). Lift the pin once faster-whisper releases a fix.
-- **Timestamps** are segment-level only (no word timestamps). Language auto-detection uses the
-  first 30 seconds.
-- **Not included:** authentication, per-client rate limits, and automatic deletion of old audio
-  (files stay in `data/audio` until you remove them).
