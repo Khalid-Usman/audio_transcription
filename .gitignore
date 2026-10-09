@@ -1,0 +1,48 @@
+# Virtual environments
+.venv/
+venv/
+env/
+.conda/
+.DS_Store/
+
+# Local configuration (may contain passwords)
+.env
+.env.*
+!.env.example
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Test and tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Downloaded Whisper models
+models/
+
+# Uploaded / generated audio and local job files
+data/
+/*.wav
+/*.mp3
+/*.m4a
+/*.flac
+/*.ogg
+
+# Local database files (e.g. a PostgreSQL data directory created for development)
+pgdata/
+*.db
+*.sqlite3
+*.log
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
